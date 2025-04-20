@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KMP Simulation – Variable Animation Only</title>
+  <style>
+    body {
+      background: #121212;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h2, h3 {
+      text-align: center;
+      color: #fff;
+    }
+    .input-section, .simulation-section {
+      width: 90%;
+      max-width: 800px;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+    .input-section input {
+      background: #333;
+      border: none;
+      padding: 8px;
+      margin: 10px;
+      color: #eee;
+      border-radius: 4px;
+      font-size: 16px;
+      width: 250px;
+    }
+    .input-section button, .next-step {
+      background: #2c7dfa;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.3s ease;
+      margin: 10px;
+    }
+    .input-section button:hover, .next-step:hover {
+      background: #2268c1;
+    }
+    .box {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      line-height: 40px;
+      margin: 5px;
+      text-align: center;
+      border: 2px solid #555;
+      border-radius: 4px;
+      background: #2e2e2e;
+      color: #eee;
+      transition: transform 0.4s ease, border 0.4s ease;
+    }
+    .box.current {
+      border-color: #2c7dfa;
+      transform: scale(1.15);
+    }
+    .offset {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      margin: 5px;
+    }
+    .var-panel {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 18px;
+    }
+    .var-panel span {
+      margin: 0 15px;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+    .explanation {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>KMP Simulation – Variable Animation</h2>
+
+  <div class="input-section">
+    <h3>Enter Pattern & Text</h3>
+    <input type="text" id="inputPattern" placeholder="Pattern (e.g., ababc)" value="ababc">
+    <input type="text" id="inputText" placeholder="Text (e.g., ababcababcababc)" value="ababcababcababc">
+    <button onclick="startSimulation()">Start Simulation</button>
+  </div>
+
+  <div class="simulation-section" id="simulationSection" style="display:none;">
+    <div id="lpsPhase">
+      <h3>Phase 1: LPS Array Computation</h3>
+      <div id="patternContainer" style="text-align:center;"></div>
+      <div class="var-panel">
+        <span>i: <span id="var_i">-</span></span> | 
+        <span>lps_length: <span id="var_lps_length">-</span></span>
+      </div>
+      <div id="lpsOutput" style="text-align:center; margin-top:10px;">
+        <strong>LPS:</strong> <span id="lpsArray"></span>
+      </div>
+      <div class="explanation" id="lpsExplanation">Click "Next Step" to start LPS computation.</div>
+    </div>
+
+    <div id="searchPhase" style="display:none;">
+      <h3>Phase 2: Pattern Searching</h3>
+      <div style="text-align:center;">
+        <strong>Text:</strong>
+        <div id="textContainer" style="margin: 10px 0;"></div>
+      </div>
+      <div style="text-align:center;">
+        <strong>Pattern Alignment:</strong>
+        <div id="alignedPatternContainer" style="margin: 10px 0;"></div>
+      </div>
+      <div class="var-panel">
+        <span>i (Text): <span id="var_search_i">-</span></span> | 
+        <span>j (Pattern): <span id="var_search_j">-</span></span>
+      </div>
+      <div class="explanation" id="searchExplanation">Click "Next Step" to search the pattern.</div>
+    </div>
+
+    <button class="next-step" onclick="nextStep()">Next Step</button>
+  </div>
+
+  <script>
+    let pattern = "", text = "";
+    let lps = [];
+    let i = 1, lps_length = 0;
+    let search_i = 0, search_j = 0;
+    let phase = "LPS";
+
+    function updateLPSVars() {
+      document.getElementById("var_i").innerText = i;
+      document.getElementById("var_lps_length").innerText = lps_length;
+    }
+
+    function updateSearchVars() {
+      document.getElementById("var_search_i").innerText = search_i;
+      document.getElementById("var_search_j").innerText = search_j;
+    }
+
+    function renderPattern() {
+      const container = document.getElementById("patternContainer");
+      container.innerHTML = "";
+      for (let idx = 0; idx < pattern.length; idx++) {
+        const box = document.createElement("div");
+        box.className = "box";
+        box.innerText = pattern[idx];
+        if (idx === i || idx === lps_length) {
+          box.classList.add("current");
+        }
+        container.appendChild(box);
+      }
+    }
+
+    function renderText() {
+      const container = document.getElementById("textContainer");
+      container.innerHTML = "";
+      for (let idx = 0; idx < text.length; idx++) {
+        const box = document.createElement("div");
+        box.className = "box";
+        box.innerText = text[idx];
+        if (idx === search_i) {
+          box.classList.add("current");
+        }
+        container.appendChild(box);
+      }
+    }
+
+    function renderAlignedPattern() {
+      const container = document.getElementById("alignedPatternContainer");
+      container.innerHTML = "";
+      const offset = Math.max(0, search_i - search_j);
+      for (let k = 0; k < offset; k++) {
+        const spacer = document.createElement("div");
+        spacer.className = "offset";
+        container.appendChild(spacer);
+      }
+      for (let idx = 0; idx < pattern.length; idx++) {
+        const box = document.createElement("div");
+        box.className = "box";
+        box.innerText = pattern[idx];
+        if (idx === search_j) {
+          box.classList.add("current");
+        }
+        container.appendChild(box);
+      }
+    }
+
+    function stepLPS() {
+      const explanation = document.getElementById("lpsExplanation");
+      if (i >= pattern.length) {
+        explanation.innerHTML = `LPS complete: [${lps.join(", ")}]. Switching to Pattern Searching.`;
+        phase = "SEARCH";
+        document.getElementById("lpsPhase").style.display = "none";
+        document.getElementById("searchPhase").style.display = "block";
+        search_i = 0;
+        search_j = 0;
+        renderText();
+        renderAlignedPattern();
+        updateSearchVars();
+        document.getElementById("searchExplanation").innerText = "Click 'Next Step' to start pattern search.";
+        return;
+      }
+      if (pattern[i] === pattern[lps_length]) {
+        lps_length++;
+        lps[i] = lps_length;
+        explanation.innerHTML = `Match: pattern[${i}] ('${pattern[i]}') equals pattern[${lps_length - 1}] ('${pattern[lps_length - 1]}'). Increment lps_length to ${lps_length}.`;
+        i++;
+      } else {
+        if (lps_length !== 0) {
+          explanation.innerHTML = `Mismatch: Set lps_length = lps[lps_length-1] = ${lps[lps_length - 1]}.`;
+          lps_length = lps[lps_length - 1];
+        } else {
+          explanation.innerHTML = `Mismatch with no previous match: Set lps[${i}] = 0.`;
+          lps[i] = 0;
+          i++;
+        }
+      }
+      renderPattern();
+      updateLPSVars();
+      document.getElementById("lpsArray").innerText = lps.join(", ");
+    }
+
+    function stepSearch() {
+      const explanation = document.getElementById("searchExplanation");
+      if (search_i >= text.length) {
+        explanation.innerHTML = `<strong>Simulation complete.</strong> End of text reached.`;
+        return;
+      }
+
+      if (text[search_i] === pattern[search_j]) {
+        explanation.innerHTML = `Match: text[${search_i}] ('${text[search_i]}') equals pattern[${search_j}] ('${pattern[search_j]}').`;
+        search_i++;
+        search_j++;
+      } else {
+        explanation.innerHTML = `Mismatch: text[${search_i}] ('${text[search_i]}') ≠ pattern[${search_j}] ('${pattern[search_j]}').`;
+        if (search_j !== 0) {
+          search_j = lps[search_j - 1];
+          explanation.innerHTML += ` Using LPS, update j to ${search_j}.`;
+        } else {
+          search_i++;
+          explanation.innerHTML += ` No previous match; increment i.`;
+        }
+      }
+
+      if (search_j === pattern.length) {
+        explanation.innerHTML = `<span style="color:#66bb6a;">Pattern found at index ${search_i - search_j}!</span>`;
+        search_j = lps[search_j - 1];
+      }
+
+      updateSearchVars();
+      renderText();
+      renderAlignedPattern();
+    }
+
+    function nextStep() {
+      if (phase === "LPS") {
+        stepLPS();
+      } else {
+        stepSearch();
+      }
+    }
+
+    function startSimulation() {
+      pattern = document.getElementById("inputPattern").value.trim();
+      text = document.getElementById("inputText").value.trim();
+      if (!pattern || !text) {
+        alert("Please enter both a pattern and a text.");
+        return;
+      }
+      i = 1;
+      lps_length = 0;
+      lps = new Array(pattern.length).fill(0);
+      phase = "LPS";
+      document.getElementById("simulationSection").style.display = "block";
+      document.getElementById("lpsPhase").style.display = "block";
+      document.getElementById("searchPhase").style.display = "none";
+      renderPattern();
+      updateLPSVars();
+      document.getElementById("lpsArray").innerText = "";
+      document.getElementById("lpsExplanation").innerText = "Click 'Next Step' to start LPS computation.";
+    }
+  </script>
+
+</body>
+</html>
